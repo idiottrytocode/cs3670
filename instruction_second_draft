@@ -1,0 +1,84 @@
+Q1) Design a network application protocol for this application and justify your design decision. In
+your protocol design, you should address the following. [35 points]
+1. The communication patterns of the network application.
+2. Define the protocol design goals.
+3. Define the message format, structure and semantics
+4. Design the communication rul
+
+A1) 
+1. The communication pattern: 
+	1. there will be 3 struct type portocal in total 
+	2. struct seeker{}, is request msg send by seeker client to server 
+	3. struct creator{} is request msg sned by creator client to server 
+	4. struct response{} is send by server to both type of client 
+	5. the pattern:
+		1. client init connection by sending request msg 
+		2. server response msg 
+		3. creator and seeker will bahave differently:
+			1. creator will maintian connection to server until explictily told by server to terminate connection, in the event of completion or forced termination. 
+			2. seeker will exchange several msg with server to indicate job selection, and completion status. Connection may be termiante when job is finished(success/fail) or by forced termination or by design. 
+ 
+2. Define protocal desgin goals: 
+	1. allow server and client to exchange information about job 
+	2. allow server to distiguish different type of client, creator or seeker 
+	3. allow server's response to be recognized by both type of clients 
+	4. make the protocal simple and symnetrical as much as possible 
+	5. ignore header size and redundence in exchange for simplier expression 
+	6. make it more human friendly than machine optimized 
+
+
+3. Message formate: 
+	1. struct seeker{
+		char who;  // 's' indicate a job seeker
+		int id[4]; // each seeker have a unique seeker id 
+		int status; // (1 seeking)(2 accepting)(3 rejecting)(4 competing)
+			    //(5, failing)
+		int term: // none zero unconditionaly termianting, 0 for no action
+		int msgSize; indicate index to end of msg in body 
+		char body[100000]; // msg 
+	}
+	2. struct creator{
+		char who; // 'c' indicate creator 
+		int id[4]; // unique id for creator 
+		int status; // (0 require seeker to maintain connetion)(non zero instruct seeker to close connection after accpritng jobs)
+		int type; // job type, predefined 1-100 
+		int term; // unconditionaly terminate connection, discard all job
+		int size; // job size, compare to server maxSize
+		int msgSize; // index of end of msg in body 
+		char body[100000]; // msg 
+	}
+	3. struct response{
+		int status; 
+		int term; 
+		int msgSize; 
+		char body[100000]; 
+	}
+4. Design the communication rule 
+	1. rules for server: 
+		1. server recv request first identify sender type(seeker/creator)
+		2. checking id in working zone, if already record in process, send response with term set on to close this attemp. 
+		3. for creator: check is job is larger than maxSize, if so subdivided into several jobs, then matching seeker, if any in queue. Left over will be push onto creator queue.
+			3.0 if status(in creator request) is set to 1, server will close connection bewteen seeker and server once seeker accpet the job. If status is set to 0, conneciton between server and seeker will keep open until furthur notice. 
+			3.1 any matched job will be moved to working zone list. 
+			3.2 any complete job will be removed from wokring zone and response msg send to creator to indicate termination and report result. 
+			3.3 any failed job will be requeue to creator queue and remvoe from working zone. 
+		4. for seeker: server check status 
+			4.1 status = 1, seeker is seeking any job, match and send reponse to comfirm (indicate creator id)if possible or push it onto seeker queue if not. 
+			4.2 status =2, seeking is seeking a particular job. check body for job type, and search creator queue for match. if no match, send response and terminate this attemps. 
+			4.3 status =3, seeker reject to work, check body for creator id, locate it in working zone and remove and requeue creator, send response to seeker to terminate seeker attemp. 
+			4.4 status =4, seeker complete the job, check seeker id and creator id in working zone to remove the job and send response to seekr to terminate connection. if no other creator job is in queue or working zone send response to creator to close connection. 
+			4.5 status =5, seeker failed the job, locate the job in working zone, remove it and requeue to creator array. send response to seeker to terminate connection. 
+	2. rules for seeker as client: 
+		1. seeker initiate connection to server for a job
+		2. if reponse msg set term on, unconditionally terminate connection
+		3. seeker send another msg to server indicate accepting or rejecting the job 
+		4. seeker may maintian connection or close it depends on server's next response msg 
+		5. seeker initiate(if closed connection) or send msg (if still open) to report success/ failure of job 
+		6. seeker close connection via response msg control. 
+		7. seeker may terminate connection at anytime by sending request with term set on, seeker intiated termination will be viewed failed job. 
+	3. rules for creator as client: 
+		1. creator initiate connection to server to posting a job 
+		2. creator check response msg for comfrimation of matching 
+		3. creator wait for response or abort all job by send request set term to non zero 
+		4. creator close connection when server instruct(when all job is complete)
+		

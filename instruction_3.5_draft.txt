@@ -1,0 +1,74 @@
+﻿Q1) Design a network application protocol for this application and justify your design decision. In
+your protocol design, you should address the following. [35 points]
+1. The communication patterns of the network application.
+2. Define the protocol design goals.
+3. Define the message format, structure and semantics
+4. Design the communication rule
+--------------------------------------------------------------------------------
+A1) 
+1. The communication pattern: 
+	1. there will be 3 struct type protocol in total 
+	2. struct request_sk{}, is request msg send by seeker client to server 
+	3. struct request_ct{} is request msg send by creator client to server 
+	4. struct response{} is send by server to both type of clients 
+	5. the pattern:
+		1. client init connection by sending request msg 
+		2. server will try to perform a match by sending request party a respose msg includeing connection info of the counter part, and remove them from queue 
+		3. if matching failed, server will queue the request part and waiting for counner part 
+		4. the request party(creator or seeker ) will then communicate at thier own will or reconnect to server for new match 
+ 
+2. Define protocol design goals: 
+	1. allow server and client to exchange information about job 
+	2. allow server to distinguish different type of client, creator or seeker 
+	3. allow server's response to be recognized by both type of clients 
+	4. make the protocol as simple/symmetrical as possible 
+	5. ignore header size and redundancy in exchange for simplified expression 
+	6. make it more human friendly than machine optimized 
+
+
+3. Message format: 
+	1. struct request_sk{
+		char who;     	//'s' indicate a job seeker
+		int id[4];    	// each seeker have a unique seeker id 
+		int status;   	// (1 seeking)(2 accepting)(3 rejecting)(4 competing)
+			        	//(5, failing)
+		int term:	// none zero unconditional terminating, 0 for no action
+		int msgSize;	//indicate index to end of msg in body 
+		char body[100000];// msg 
+	}
+	2. struct request_ct{
+		char who; 		// 'c' indicate creator 
+		int id[4]; 		// unique id for creator 
+		int status; 	// (0 require seeker to maintain connection)(non zero instruct seeker to close connection after accepting jobs)
+	
+		int term; 	    // unconditional terminate connection, discard all job
+		int size; 		// job size, compare to server maxSize
+		int msgSize; 	// index of end of msg in body 
+		char body[100000]; // msg will include job type which is predefined by server 
+	}
+	3. struct response{
+		int status; 
+		int term; 
+		int msgSize; 
+		char body[100000]; 
+	}
+4. Design the communication rule 
+	1. rules for server: 
+		1. server recv request first identify sender type(seeker/creator)
+		2. after identify the requesting party, go to its counter queue to pop next avaliable counter part
+		3. send information of the counter party {who, id, jobId, size, msg} to requesting party. 
+		4. close connection with requesting party 
+	2. rules for seeker as client: 
+		1. seeker initiate connection to server for a job
+		2. if response msg set term on, unconditionally terminate connection
+		3. seeker send another msg to server indicate accepting or rejecting the job 
+		4. seeker may maintain connection or close it depends on server's next response msg 
+		5. seeker initiate(if closed connection) or send msg (if still open) to report success/ failure of job 
+		6. seeker close connection via response msg control. 
+		7. seeker may terminate connection at anytime by sending request with term set on, seeker initiated termination will be viewed failed job. 
+	3. rules for creator as client: 
+		1. creator initiate connection to server to posting a job, job type inclosed in body 
+		2. creator check response msg for confirmation of matching 
+		3. creator wait for response or abort all job by send request set term to non zero 
+		4. creator close connection when server instruct(when all job is complete)
+		

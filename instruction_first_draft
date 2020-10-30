@@ -1,0 +1,117 @@
+You are required to design and implement a communication protocol for a network application. 
+
+The network application enables a group of nodes (end systems) to communicate over TCP/IP networks.
+-> using AF_INET 
+!!!
+
+The nodes in this network application are divided into two groups, namely job-seeker and job-creator.
+-> header need to identify 2 group of struct protocal user 
+!!!
+
+For simplicity, assume that the node during any active communication scenario could only play one role (job-seeker or job-creator). 
+
+
+Also, the job-seeker nodes do not connect directly to each others.
+-> need to identify who is sender this protocal 
+-> int 0/1 indicate server/ client is sneding this msg where 0/0 msg will be ignored 
+!!!
+
+Each job-seeker connects to one job-creator at a time, even if there are more than one job-creator.
+-> server connect one client with type 0 with anonter of type 1 
+!!!
+
+The job-seeker offers his services (e.g., computational resources) to the job-creator. 
+
+The job-creator depends on the availability of a job (e.g. computational task). It could assign the job immediately to
+the job-seeker or take a note of the job-seeker availability to give it a job when a job becomes available. 
+-> server have a queue to allow asynm connection 
+!!!
+
+There is a predefined set of job-types that the job-creator could assign to the seekers. 
+-> protocal include job type an int 
+!!!
+
+Depend on the job size, the creator could give the same job to multiple job-seekers. 
+-> protocal include job size and a predefien thresholde to divide the job 
+-> or a seperate queue on server to host it 
+!!!
+
+After the job is assigned to the seeker, the connection could be maintained or terminated depending on the job.
+-> protocal incldue how to behave after assignment 
+!!!
+
+When the seeker completed the job, it reports the job status and any result to the job creator. 
+-> protocal include what msg nature it is 
+!!!
+
+The creator could assig multiple jobs to the job-seeker, but one job at a time. 
+-> create can post only one job but can divide the job to mutiple seeker 
+
+
+The job seeker could accept/reject a job.
+-> protocal need to explain accpet or declne 
+
+The creator or the seeker could choose to terminate the connection at any time.
+-> connection termiantion 
+
+
+Q1) Design a network application protocol for this application and justify your design decision. In
+your protocol design, you should address the following. [35 points]
+1. The communication patterns of the network application.
+2. Define the protocol design goals.
+3. Define the message format, structure and semantics
+4. Design the communication rul
+ 
+
+summary of protocal feature
+1. indicate a seeker or creater 
+2. indicate job status by seeker: seeking or completeing or failing or rejecting or accepting job
+2. indicate job type 
+3. indicate job size 
+4. indicate connection status 
+5. indicate immediate terminatio of conneciton regardless of job 
+
+summary of server rule: 
+1. need to have 3 queue 
+	1. one for seeker inqury 
+	2. one for creater inqury 
+	3. one for large size creater inqury 
+2. seeker inquey can be paired with creater queue or large size creater queue  
+3. pairing will pause if seeker / creater (large create) run out and wait for new incoming connection 
+4. server will perform connection termiantion based on connection status 
+5. server allowe creater to post mutiple jobs 
+6. server no allow seeker post mutiple jobs 
+
+
+use case seeker: 
+0. seeker and cerate will have differnet protocal 
+1. seeker send server {1. I am a seeker, 2 my id 3 status(posting, accpeting, rejecing, failing, completing), 4 body}
+2. server recv seeker packed, check status
+	1. posing: search queue of creater to find a match or add to seeker queue 
+	2. accpeting:
+		1. remove job from creator queue to working array if smaller than max signle  
+		1. reduce size, add to working without pop from queue if larger than max signle 
+	3. rejecting: send back a repsonse msg to seeker to termiante action 
+	4. failing: 
+		1. remove job from working requeue job into creator if only in working queue not in creater queue 
+		2. increase job size in creater quque and remove from working queue 
+		3. send termination to seeker 
+	5. complting:
+		1. remove from working queue and send response termination msg to seeker if > max signle 
+		2. remove from working array and send response termiantion msg to both seeker and creator 
+3. seeker recieve response msg  {1.status, 2, termin, 3. body } 
+	1. tendering:
+		check body from informaiton and send reply for accepting or rejecting 
+	2. comfirmation: 
+		read body for sleep n sec simulating working time 
+		do nothing and wait 
+	3. termin: 
+		immediately terminate connection 
+4. seeker send packed and seek response until connecitn is disconnected 
+		
+user case for creator: 
+1. creator send server {1 I am creator,2 my id, 3 job size 4. termin }
+2. server recieve, mathcing or queueing, send back response {1. status, 2. termin, 3 body }
+	1. matching: status = comfirming, termin = false, body = 
+	2. queueing: status = tendering, 
+

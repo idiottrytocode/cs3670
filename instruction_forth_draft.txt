@@ -1,0 +1,66 @@
+﻿Q1) Design a network application protocol for this application and justify your design decision. In
+your protocol design, you should address the following. [35 points]
+1. The communication patterns of the network application.
+2. Define the protocol design goals.
+3. Define the message format, structure and semantics
+4. Design the communication rule
+--------------------------------------------------------------------------------
+A1) 
+1. The communication pattern: 
+	1. there will be 2 struct type protocol in total 
+	2. struct request{}, is request msg send by seeker to creator  
+	3. struct response{} is response msg send by creator to seeker  
+	5. the pattern:
+		1. client init connection by sending request msg indicate msg status
+		2. creator recv request, check msg status, react. 
+		3. both seeker and creator can abort task and close down connection
+ --------------------------------------------------------------------------------
+2. Define protocol design goals: 
+	1. allow creator and seeker to exchange information about job 
+	2. make the protocol as simple/symmetrical as possible 
+	3. ignore header size and redundancy in exchange for simplified expression 
+	4. make it more human friendly than machine optimized 
+
+--------------------------------------------------------------------------------
+3. Message format: 
+	0. #define maxSize 100000
+	1. struct request{
+		char who;     	//'s' indicate a job seeker
+		int id[4];    	// each seeker have a unique seeker id 
+		int status;   	// (1 seeking)(2 accepting)(3 rejecting)(4 competing)(5, failing); 
+		int term:	// non zero value immediate abort operation
+		int msgSize;	//indicate index to end of msg in body 
+		char body[maxSize];// msg 
+	}
+	2. struct response{
+		int term; // non zero indicate seeker should close connection now.
+		int msgSize; // size of msg in body
+		char body[maxSize]; 
+	}
+--------------------------------------------------------------------------------
+4. Design the communication rule 
+
+1. rules for seeker: 
+		0. if connection failed, seeker quit. No job is available
+		1. seeker initiate connection to creator for a job
+		2. seeker connect, send msg identifying status as posting seeking  
+		3. seeker recv response, check job type in body, determine whether to accepting or rejecting. 
+		4. if rejecting, seeker send rejection and close connection. 
+		5. if accepting, seeker send back accepting request, and recv a job in next response body. 
+		5. check response termination instruction, if instruct seeker to maintain connection, TCP will remain open until seeker complete job, if instruct to close connection, TCP will be close and re-initiated later. 
+		6. seeker re_initiate TCP connection if necessary. 
+		7. seeker send final report to creator, indicate success or failure.
+		8. if failed, abort or any other form of incomplete states, seeker send request indicating failure and include job detail in body.
+		9. in case when seeker successfully connected, but all job is assigned out, seeker connection will be maintain open but idle. 
+	
+2. rules for creator: 
+		0. creator first prepare job queue and remaining-job log, where larger than maxSize job subdivided into smaller pieces. 
+		1. creator running online 
+		2. creator check request msg, peek job queue, indicate job type in response msg and send it back to seeker.  
+		3. creator pop the job from queue if seeker indicate accepting, and send away the whole thing in msg body. 
+		4. creator close connection with seeker if indicate rejection. 
+		5. creator keep running until remaining-job log is 0. 
+		6. if any time recv a failed job report, read the original job and re_queue it. 
+		7. in case of running out of jobs, a array store all attempt connection will record all seeker for later use. 
+		8. in case of running out of seeker array, all future connection attempts will be turn down. 
+		
