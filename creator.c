@@ -28,7 +28,7 @@ int main(void)
 	/* section 0 prepare creator log and queue*/
 	// assume job size smaller than MAXSIZE, no need subdivide 
 	int log = 1; 
-	char* job = "13 IAMTHEJOB\0";
+	char* job = "13 IAMJOBAREYOUSTEVE\0";
 	char* array[log];
 	array[0]=job;
 	/*----------------------*/
@@ -92,20 +92,57 @@ int main(void)
 	}
 	
 	// checking incoming msg is from seeker and identify status 
-	 
+	// if request status ==1 then send back job type in response body
+	if(req.status == 1){
 
-	// Respond to client:
-	strcpy(server_message, "This is the server's message.");
-
-	if (send(client_sock, server_message, strlen(server_message), 0) < 0){
-		printf("Can't send\n");
-		return -1;
+		strcpy(req.body,job);		
+		if (send(client_sock, res, sizeof(res), 0) < 0){
+			printf("Can't send\n");
+			return -1;
+		}			
 	}
 
-	// Closing the socket:
-	close(client_sock);
-	close(socket_desc);
+	// Respond to seekers status 2 acceping request 
+	if (recv(client_sock, req, sizeof(struct request), 0) < 0){
+		printf("Couldn't receive\n");
+		return -1;
+	}
+	if(req.status == 2){
 
+		if (send(client_sock, res, sizeof(res), 0) < 0){
+			printf("Can't send\n");
+			return -1;
+		}			
+		// pop queue ommited for this version 
+
+	}
+
+	// seeker send success report close sned instruction to close connection 
+	// reduce log  
+	if (recv(client_sock, req, sizeof(struct request), 0) < 0){
+		printf("Couldn't receive\n");
+		return -1;
+	}
+	if(req.status == 4){
+
+		res.term =1; 
+		if (send(client_sock, res, sizeof(res), 0) < 0){
+			printf("Can't send\n");
+			return -1;
+		}			
+		log--;
+	}
+
+
+	// a grand loop here will dealt with all other cases if log is stll postive 
+
+	// Closing the socket:
+	if(log<=0){
+		close(client_sock);
+		close(socket_desc);
+	}
+	
+	
 	return 0;
 }
 
